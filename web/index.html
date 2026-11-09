@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BattChain · Cek Riwayat Baterai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.17.0/dist/ethers.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  :root {
+    --navy: #10212B; --green: #17735D; --mint: #6FD3B0; --bg: #F6F7F2; --card: #FCFDFA;
+    --line: #DCE3DE; --ink: #14222B; --muted: #5E6B76; --soft: #E9EFEA; --bad: #A8432A; --badbg: #FBEDE8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--navy); color: #F2F4EE; }
+  .bar { max-width: 1080px; margin: 0 auto; padding: 18px 24px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .logo { font: 700 26px "Space Grotesk", system-ui, sans-serif; color: var(--mint); letter-spacing: -0.5px; }
+  .tag { color: #B9CBC6; font-size: 15px; }
+  main { max-width: 1080px; margin: 0 auto; padding: 28px 24px 48px; display: grid; gap: 20px; }
+  h1 { font: 600 30px/1.15 "Space Grotesk", system-ui, sans-serif; margin: 0 0 4px; letter-spacing: -0.5px; }
+  h2 { font: 600 19px "Space Grotesk", system-ui, sans-serif; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
+  form { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 12px; align-items: end; }
+  label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  input[type=text] { font: 15px "IBM Plex Sans", system-ui, sans-serif; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); width: 100%; }
+  input[type=text]:focus { outline: 2px solid var(--mint); border-color: var(--green); }
+  button { font: 600 15px "IBM Plex Sans", system-ui, sans-serif; background: var(--green); color: #fff; border: 0; border-radius: 10px; padding: 11px 20px; cursor: pointer; }
+  button:hover { background: #0F5E4B; }
+  details { margin-top: 12px; font-size: 14px; color: var(--muted); }
+  details label { margin-top: 8px; }
+  .hint { font-size: 14px; color: var(--muted); margin: 0; }
+  .status { display: none; }
+  .msg { padding: 12px 16px; border-radius: 12px; font-size: 15px; }
+  .msg.err { background: var(--badbg); color: var(--bad); }
+  .msg.ok { background: #E3F1EA; color: #0F5E4B; }
+  .summary { display: grid; grid-template-columns: 1.3fr repeat(3, 1fr); gap: 14px; }
+  .big { background: var(--navy); color: #F2F4EE; border: 0; }
+  .big .num { font: 700 52px/1 "Space Grotesk", system-ui, sans-serif; color: var(--mint); letter-spacing: -1px; }
+  .k { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+  .big .k { color: #B9CBC6; }
+  .v { font: 600 22px "Space Grotesk", system-ui, sans-serif; margin-top: 6px; }
+  .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .big .sub { color: #B9CBC6; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th { text-align: left; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); padding: 10px 10px; background: var(--soft); }
+  td { padding: 11px 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .soh { display: flex; align-items: center; gap: 10px; }
+  .meter { width: 90px; height: 8px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--green); }
+  .pill { display: inline-block; font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--soft); color: var(--ink); }
+  .pill.refurb { background: #FFF1D6; color: #7A4B00; }
+  .pill.match { background: #D3EBDD; color: #0F5E4B; }
+  code { font: 13px "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+  .two { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+  .qr { display: flex; gap: 16px; align-items: center; }
+  .qr svg, .qr img { width: 132px; height: 132px; flex: none; }
+  footer { max-width: 1080px; margin: 0 auto; padding: 0 24px 32px; color: var(--muted); font-size: 13.5px; }
+  @media (max-width: 820px) {
+    form, .summary, .two { grid-template-columns: 1fr; }
+    .hide-sm { display: none; }
+  }
+</style>
+</head>
+<body>
+<header><div class="bar"><span class="logo">BattChain</span><span class="tag">Riwayat kesehatan baterai EV bekas yang bisa dicek siapa saja</span></div></header>
+
+<main>
+  <section class="card">
+    <h1>Cek riwayat baterai</h1>
+    <p class="hint">Masukkan nomor seri pack baterai, atau pindai QR yang ditempel di kendaraan. Halaman ini hanya membaca blockchain: tidak perlu wallet dan tidak ada biaya gas.</p>
+    <form id="f" style="margin-top:16px">
+      <label>Nomor seri pack<input type="text" id="pack" placeholder="PACK-001" autocomplete="off"></label>
+      <label>Alamat kontrak BattChain<input type="text" id="address" placeholder="0x…" autocomplete="off"></label>
+      <button type="submit">Cek riwayat</button>
+    </form>
+    <details><summary>Pengaturan jaringan</summary>
+      <label>RPC URL<input type="text" id="rpc" value="http://127.0.0.1:8545"></label>
+    </details>
+  </section>
+
+  <div id="msg" class="msg status"></div>
+
+  <section id="result" class="status" style="display:none; gap:20px">
+    <div class="summary">
+      <div class="card big"><div class="k">SOH terakhir</div><div class="num" id="sohLast">–</div><div class="sub" id="sohLastSub"></div></div>
+      <div class="card"><div class="k">Status</div><div class="v" id="regStatus">–</div><div class="sub" id="regBy"></div></div>
+      <div class="card"><div class="k">Kapasitas nominal</div><div class="v" id="nominal">–</div><div class="sub">dicatat saat pendaftaran</div></div>
+      <div class="card"><div class="k">Riwayat uji</div><div class="v" id="count">–</div><div class="sub" id="labs"></div></div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <h2>Semua hasil uji, dari semua lab</h2>
+      <table>
+        <thead><tr><th>#</th><th>Dicatat</th><th>Lab</th><th>SOH</th><th class="num">Odometer</th><th class="num">Siklus</th><th>Jenis</th><th class="hide-sm">Hash laporan</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="two" style="margin-top:20px">
+      <div class="card">
+        <h2>Cocokkan file laporan</h2>
+        <p class="hint">Pilih file laporan dari lab. Halaman menghitung SHA-256-nya di perangkatmu dan membandingkan dengan hash yang tercatat di chain. Kalau tidak ada yang cocok, file itu sudah diubah atau bukan laporan baterai ini.</p>
+        <input type="file" id="file" style="margin-top:12px">
+        <div id="fileMsg" class="msg status" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <h2>Bagikan riwayat ini</h2>
+        <div class="qr"><div id="qr"></div><p class="hint">QR ini membuka halaman yang sama untuk baterai ini. Cetak dan tempel di kendaraan, atau kirim ke calon pembeli dan leasing.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>Prototipe MVP ET-4133 Infrastruktur Blockchain · Data diambil langsung dari smart contract lewat fungsi <code>getHistory</code>. Nama lab di halaman ini adalah label akun demo Hardhat; di sistem nyata nama diambil dari daftar lab terdaftar.</footer>
+
+<script>
+const ABI = [
+  "function batteries(bytes32) view returns (bool registered, uint32 nominalWh, address registrar)",
+  "function getHistory(bytes32) view returns (tuple(address lab, uint64 timestamp, uint16 sohBps, uint32 odometerKm, uint32 cycleCount, bytes32 reportHash, bool refurbish)[])",
+];
+// Label akun demo Hardhat (akun #1–#3). Di produksi: dari registri lab.
+const LABELS = {
+  "0x70997970c51812dc3a010c7d01b50e0d17dc79c8": "Pabrikan (demo)",
+  "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc": "Lab A (demo)",
+  "0x90f79bf6eb2c4f870365e785982e1f101e93b906": "Lab B (demo)",
+};
+const $ = (id) => document.getElementById(id);
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
+const who = (a) => LABELS[a.toLowerCase()] || short(a);
+const pct = (bps) => (Number(bps) / 100).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
+const num = (n) => Number(n).toLocaleString("id-ID");
+const tgl = (t) => new Date(Number(t) * 1000).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+let current = [];
+
+function show(el, text, kind) { el.textContent = text; el.className = "msg " + kind; el.style.display = "block"; }
+
+async function check(e) {
+  if (e) e.preventDefault();
+  const pack = $("pack").value.trim(), address = $("address").value.trim(), rpc = $("rpc").value.trim();
+  $("result").style.display = "none"; $("msg").style.display = "none";
+  if (!pack) return show($("msg"), "Isi nomor seri pack dulu.", "err");
+  if (!ethers.isAddress(address)) return show($("msg"), "Alamat kontrak tidak valid.", "err");
+  try {
+    const provider = new ethers.JsonRpcProvider(rpc, undefined, { staticNetwork: true });
+    const bc = new ethers.Contract(address, ABI, provider);
+    const id = ethers.keccak256(ethers.toUtf8Bytes(pack)); // sama dengan idOf() di kontrak
+    const [b, h] = await Promise.all([bc.batteries(id), bc.getHistory(id)]);
+    if (!b.registered) return show($("msg"), `Baterai ${pack} belum terdaftar di BattChain. Jangan percaya angka SOH yang tidak punya riwayat.`, "err");
+    current = h;
+    render(pack, address, rpc, b, h);
+  } catch (err) {
+    show($("msg"), "Tidak bisa membaca kontrak. Cek RPC URL dan alamat kontrak. (" + (err.shortMessage || err.message) + ")", "err");
+  }
+}
+
+function render(pack, address, rpc, b, h) {
+  $("regStatus").textContent = "Terdaftar ✓";
+  $("regBy").textContent = "oleh " + who(b.registrar);
+  $("nominal").textContent = num(Number(b.nominalWh) / 1000) + " kWh";
+  const labs = new Set(h.map((r) => r.lab.toLowerCase())).size;
+  $("count").textContent = `${h.length} catatan`;
+  $("labs").textContent = `dari ${labs} lab berbeda`;
+  if (h.length) {
+    const last = h[h.length - 1];
+    $("sohLast").textContent = pct(last.sohBps);
+    $("sohLastSub").textContent = `${last.refurbish ? "setelah refurbish" : "uji"} · ${who(last.lab)} · ${num(last.odometerKm)} km`;
+  } else {
+    $("sohLast").textContent = "–"; $("sohLastSub").textContent = "belum ada hasil uji";
+  }
+  $("rows").innerHTML = h.map((r, i) => `<tr id="row${i}">
+      <td>${i + 1}</td><td>${tgl(r.timestamp)}</td><td>${who(r.lab)}</td>
+      <td><div class="soh"><b>${pct(r.sohBps)}</b><span class="meter"><i style="width:${Number(r.sohBps) / 100}%"></i></span></div></td>
+      <td class="num">${num(r.odometerKm)} km</td><td class="num">${num(r.cycleCount)}</td>
+      <td><span class="pill ${r.refurbish ? "refurb" : ""}">${r.refurbish ? "Refurbish" : "Uji"}</span></td>
+      <td class="hide-sm"><code>${r.reportHash.slice(0, 10)}…${r.reportHash.slice(-6)}</code></td></tr>`).join("");
+  $("fileMsg").style.display = "none";
+  const share = new URL(location.href);
+  share.search = new URLSearchParams({ address, pack, ...(rpc !== "http://127.0.0.1:8545" ? { rpc } : {}) }).toString();
+  history.replaceState(null, "", share);
+  if (window.qrcode) {
+    const q = qrcode(0, "M"); q.addData(share.toString()); q.make();
+    $("qr").innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+  }
+  $("result").style.display = "grid";
+}
+
+$("file").addEventListener("change", async () => {
+  const f = $("file").files[0];
+  if (!f) return;
+  const hash = ethers.sha256(new Uint8Array(await f.arrayBuffer()));
+  document.querySelectorAll("tbody tr").forEach((tr) => (tr.style.background = ""));
+  const i = current.findIndex((r) => r.reportHash.toLowerCase() === hash.toLowerCase());
+  if (i >= 0) {
+    $("row" + i).style.background = "#E3F1EA";
+    show($("fileMsg"), `Cocok dengan catatan #${i + 1} (${who(current[i].lab)}, SOH ${pct(current[i].sohBps)}). Laporan ini asli dan belum diubah.`, "ok");
+  } else {
+    show($("fileMsg"), `Tidak cocok dengan catatan mana pun. SHA-256 file: ${hash.slice(0, 14)}…`, "err");
+  }
+});
+
+$("f").addEventListener("submit", check);
+const p = new URLSearchParams(location.search);
+if (p.get("rpc")) $("rpc").value = p.get("rpc");
+if (p.get("address")) $("address").value = p.get("address");
+if (p.get("pack")) $("pack").value = p.get("pack");
+if (p.get("address") && p.get("pack")) check();
+</script>
+</body>
+</html>
