@@ -1,0 +1,9 @@
+CONTOH LAPORAN UJI BATERAI (data fiktif untuk demo BattChain)
+Lab           : Lab A (akun Hardhat #2)
+Tanggal uji   : 2026-11-02
+Nomor seri    : PACK-001 (kapasitas nominal 60 kWh)
+Metode        : pengosongan arus konstan C/3 dari 100% ke 0%, suhu 25 °C
+Kapasitas ukur: 56,4 kWh
+SOH           : 94,00%
+Odometer      : 18.000 km
+Siklus (BMS)  : 320

@@ -1,0 +1,9 @@
+CONTOH LAPORAN REFURBISH BATERAI (data fiktif untuk demo BattChain)
+Lab           : Lab A (akun Hardhat #2)
+Tanggal       : 2026-11-07
+Nomor seri    : PACK-001 (kapasitas nominal 60 kWh)
+Pekerjaan     : penggantian 2 modul yang menurun, balancing sel
+Kapasitas ukur: 58,8 kWh
+SOH           : 98,00%
+Odometer      : 26.000 km
+Siklus (BMS)  : 455
