@@ -1,0 +1,351 @@
+<title>BattChain MVP</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a working console. Header band with chain status, then two columns (act | read), full-width transaction log below. */
+:root {
+  --bg: #F3F5F0; --surface: #FCFDFA; --ink: #14222B; --muted: #566470; --line: #D8E0DA; --soft: #E7EDE8;
+  --accent: #17735D; --accent-ink: #0F5E4B; --on-accent: #FFFFFF; --focus: #3FAE8A;
+  --band: #10212B; --band-ink: #EEF2EC; --band-muted: #A6BAB4; --mint: #6FD3B0; --band-chip: #1A303C;
+  --ok-bg: #DCEFE4; --ok-ink: #0D5A47; --bad-bg: #FAE7E0; --bad-ink: #9E3A22; --warn-bg: #FCEFD4; --warn-ink: #73470A;
+  --code-bg: #EDF1ED; --hit: #F2F8E6;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0D161C; --surface: #14212A; --ink: #E4EBE7; --muted: #98A9B1; --line: #263741; --soft: #1B2A33;
+  --accent: #4DBB96; --accent-ink: #7FD9B8; --on-accent: #06211A; --focus: #6FD3B0;
+  --band: #091116; --band-ink: #EEF2EC; --band-muted: #8EA49E; --mint: #6FD3B0; --band-chip: #13232C;
+  --ok-bg: #12342A; --ok-ink: #8FE0BF; --bad-bg: #3A1C15; --bad-ink: #F3A690; --warn-bg: #392B10; --warn-ink: #EFC46C;
+  --code-bg: #0F1B22; --hit: #1D3326; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0D161C; --surface: #14212A; --ink: #E4EBE7; --muted: #98A9B1; --line: #263741; --soft: #1B2A33;
+  --accent: #4DBB96; --accent-ink: #7FD9B8; --on-accent: #06211A; --focus: #6FD3B0;
+  --band: #091116; --band-ink: #EEF2EC; --band-muted: #8EA49E; --mint: #6FD3B0; --band-chip: #13232C;
+  --ok-bg: #12342A; --ok-ink: #8FE0BF; --bad-bg: #3A1C15; --bad-ink: #F3A690; --warn-bg: #392B10; --warn-ink: #EFC46C;
+  --code-bg: #0F1B22; --hit: #1D3326; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Header band */
+.band { background: var(--band); color: var(--band-ink); }
+.band-in { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-block: 16px; }
+.logo { font: 700 24px/1 var(--f-display); color: var(--mint); letter-spacing: -0.5px; }
+.logo small { font: 500 14px var(--f-body); color: var(--band-muted); letter-spacing: 0; margin-left: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; align-items: center; }
+.chip { background: var(--band-chip); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--band-muted); white-space: nowrap; }
+.chip b { color: var(--band-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--mint); margin-right: 6px; vertical-align: 1px; }
+.reset { background: transparent; border: 1px solid #3B5361; color: var(--band-ink); border-radius: 999px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
+.reset:hover { border-color: var(--mint); }
+
+main.wrap { padding-block: 24px 40px; display: flex; flex-direction: column; gap: 20px; }
+#app { display: flex; flex-direction: column; gap: 20px; }
+#app[hidden] { display: none; }
+.intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 32px; align-items: end; }
+.intro h1 { font-size: 30px; line-height: 1.15; letter-spacing: -0.5px; font-weight: 600; }
+.intro p { color: var(--muted); max-width: 68ch; margin-top: 8px; }
+.facts { display: flex; gap: 20px; flex-wrap: wrap; }
+.fact { display: flex; flex-direction: column; }
+.fact .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); font-weight: 600; }
+.fact .v { font: 600 22px/1.2 var(--f-display); font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr); gap: 20px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.card h2 { font-size: 19px; font-weight: 600; }
+.sub { color: var(--muted); font-size: 13.5px; }
+.step-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); font-weight: 600; }
+
+/* Buttons */
+.btn { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 10px; padding: 11px 18px; font-weight: 600; cursor: pointer; }
+.btn:hover:not(:disabled) { filter: brightness(1.07); }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 13.5px; cursor: pointer; color: var(--ink); }
+.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); }
+button:disabled { opacity: 0.55; cursor: progress; }
+
+/* Guide */
+#guide { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+#guide li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--soft); }
+#guide li.done { background: var(--ok-bg); }
+.g-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 14px var(--f-display); background: var(--surface); border: 1px solid var(--line); }
+li.done .g-mark { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.g-body { display: flex; flex-direction: column; min-width: 0; }
+.g-title { font-weight: 500; }
+.g-expect { font-size: 13px; }
+.g-expect.ok { color: var(--ok-ink); }
+.g-expect.bad { color: var(--bad-ink); }
+.guide-foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* Actors */
+#actors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.actor { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; cursor: pointer; min-width: 0; }
+.actor:hover:not(:disabled) { border-color: var(--accent); }
+.actor.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--ok-bg); }
+.actor-name { font-weight: 600; }
+.actor-role { font-size: 12px; color: var(--muted); }
+.actor-role b { font-weight: 600; color: var(--accent-ink); }
+.actor-addr { font-size: 11.5px; color: var(--muted); }
+#actor-desc { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+
+.tabs { display: flex; gap: 4px; background: var(--soft); padding: 4px; border-radius: 10px; flex-wrap: wrap; }
+.tab { flex: 1 1 auto; border: 0; background: transparent; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--muted); }
+.tab.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+form { display: flex; flex-direction: column; gap: 12px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.fields[hidden] { display: none; }
+label.f { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--muted); min-width: 0; }
+label.f.wide { grid-column: 1 / -1; }
+input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); font-size: 15px; font-weight: 400; color: var(--ink); }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--focus) 40%, transparent); }
+.note { font-size: 13px; color: var(--warn-ink); background: var(--warn-bg); padding: 8px 12px; border-radius: 8px; }
+#tx-form.flash { animation: flash 0.9s ease; }
+@keyframes flash { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--focus) 55%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+@media (prefers-reduced-motion: reduce) { #tx-form.flash { animation: none; } }
+#tx-form { border-radius: 10px; }
+
+.result { border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.result.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.result.bad { background: var(--bad-bg); color: var(--bad-ink); }
+.res-head { font: 600 16px var(--f-display); }
+.res-hash { font-size: 12.5px; overflow-wrap: anywhere; }
+
+/* History */
+.h-row { display: flex; gap: 8px; }
+.h-row input { flex: 1; min-width: 0; }
+.h-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.h-sum > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--soft); border-radius: 10px; min-width: 0; }
+.k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); font-weight: 600; }
+.v { font: 600 16px/1.25 var(--f-display); font-variant-numeric: tabular-nums; }
+.v.big { font-size: 26px; color: var(--accent-ink); }
+.scroll { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); padding: 8px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; font-weight: 600; }
+.tbl td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl tr.hit td { background: var(--hit); }
+.soh { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.meter { width: 40px; height: 7px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; background: var(--soft); color: var(--ink); }
+.pill.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.pill.bad { background: var(--bad-bg); color: var(--bad-ink); }
+.pill.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.why { font-family: var(--f-mono); font-size: 12px; color: var(--bad-ink); }
+.empty { padding: 18px; border: 1px dashed var(--line); border-radius: 10px; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
+.empty-head { font-weight: 600; color: var(--ink); }
+.muted { color: var(--muted); }
+
+/* Verifier */
+.v-samples { display: flex; flex-wrap: wrap; gap: 6px; }
+.v-sample.on { border-color: var(--accent); background: var(--ok-bg); color: var(--ok-ink); }
+.v-tamper { border-style: dashed; }
+.file-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
+.file-pick input { font-size: 13px; max-width: 100%; }
+textarea { font-family: var(--f-mono); font-size: 12.5px; line-height: 1.55; min-height: 190px; resize: vertical; }
+textarea:disabled { opacity: 0.8; }
+.hashline { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--muted); }
+.hashline code { overflow-wrap: anywhere; color: var(--ink); }
+.v-result { border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.v-result.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.v-result.bad { background: var(--bad-bg); color: var(--bad-ink); }
+.v-result.idle { background: var(--soft); color: var(--muted); }
+
+/* Log */
+.log-row { cursor: pointer; }
+.log-row:hover td, .log-row.open td { background: var(--soft); }
+.log-detail td { background: var(--code-bg); white-space: normal; padding: 12px 14px; }
+.kv { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 10px; font-size: 13px; padding: 3px 0; }
+.kv > span { color: var(--muted); font-weight: 600; }
+.kv code { overflow-wrap: anywhere; }
+.ev { font-family: var(--f-mono); font-size: 12.5px; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 3px; }
+
+/* About */
+.about { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.about h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.about ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+details.src summary { cursor: pointer; font-weight: 600; }
+details.src pre { background: var(--code-bg); border-radius: 10px; padding: 14px; overflow-x: auto; font: 12.5px/1.55 var(--f-mono); margin: 10px 0 0; max-height: 460px; }
+.meta { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.meta code { overflow-wrap: anywhere; color: var(--ink); }
+#loading { padding: 60px 0; text-align: center; color: var(--muted); }
+footer { color: var(--muted); font-size: 13px; padding-block: 0 32px; }
+footer a { color: var(--accent-ink); }
+
+@media (max-width: 980px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .intro { grid-template-columns: minmax(0, 1fr); }
+  .about { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  #actors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .h-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chips { margin-left: 0; }
+  .intro h1 { font-size: 25px; }
+  #guide li { grid-template-columns: 28px minmax(0, 1fr); }
+  #guide li .g-btn { grid-column: 2; justify-self: start; }
+}
+</style>
+
+<header class="band">
+  <div class="wrap band-in">
+    <span class="logo">BattChain<small>MVP · coba langsung</small></span>
+    <div class="chips">
+      <span class="chip"><span class="live"></span>EVM di browser · Cancun</span>
+      <span class="chip">Kontrak <b id="contract-addr">…</b></span>
+      <span class="chip">Blok <b id="block-no">#0</b></span>
+      <button type="button" class="reset keep" id="reset">Reset jaringan</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="loading">Memuat EVM dan men-deploy kontrak…</div>
+  <div id="app" hidden>
+    <section class="intro">
+      <div>
+        <h1>Riwayat SOH baterai EV yang tidak bisa diubah diam-diam</h1>
+        <p>Kontrak BattChain asli berjalan di EVM di dalam browser ini. Bytecode-nya sama dengan yang lolos 25 tes di repo. Setiap aksi adalah transaksi bertanda tangan dengan hash, nomor blok, gas, dan event. Tidak perlu wallet, dan tidak ada dana sungguhan.</p>
+      </div>
+      <div class="facts">
+        <div class="fact"><span class="k">Transaksi</span><span class="v" id="tx-count">0</span></div>
+        <div class="fact"><span class="k">Ditolak kontrak</span><span class="v" id="tx-rejected">0</span></div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="col">
+        <section class="card" id="guide-card" aria-labelledby="g-h">
+          <div class="card-head"><h2 id="g-h">Panduan uji</h2><span class="sub" id="guide-count">0/6 selesai</span></div>
+          <p class="sub">Tekan Isi untuk mengisi formulir di bawah, lalu kirim transaksinya. Langkah tercentang otomatis kalau hasilnya sesuai.</p>
+          <ol id="guide"></ol>
+          <div class="guide-foot"><button type="button" class="btn" id="run-all">Jalankan semua otomatis</button><span class="sub">5 transaksi, lalu cek laporan</span></div>
+        </section>
+
+        <section class="card" id="tx-card" aria-labelledby="t-h">
+          <div class="card-head"><h2 id="t-h">Kirim transaksi</h2><span class="sub">ditandatangani akun yang dipilih</span></div>
+          <form id="tx-form" novalidate>
+            <span class="step-label">Akun pengirim</span>
+            <div id="actors"></div>
+            <p id="actor-desc"></p>
+            <span class="step-label">Aksi</span>
+            <div class="tabs" role="tablist">
+              <button type="button" class="tab" role="tab" data-a="register">Daftarkan baterai</button>
+              <button type="button" class="tab" role="tab" data-a="test">Catat uji</button>
+              <button type="button" class="tab" role="tab" data-a="refurb">Refurbish</button>
+              <button type="button" class="tab" role="tab" data-a="grant">Beri peran</button>
+            </div>
+            <div class="fields" id="f-battery">
+              <label class="f wide">Nomor seri pack<input type="text" id="serial" value="PACK-001" autocomplete="off"></label>
+            </div>
+            <div class="fields" id="f-nominal">
+              <label class="f">Kapasitas nominal (kWh)<input type="number" id="kwh" value="60" min="1" step="0.1"></label>
+            </div>
+            <div class="fields" id="f-test" hidden>
+              <label class="f">SOH (%)<input type="number" id="soh" value="94" step="0.01" min="0" max="100"></label>
+              <label class="f">Odometer (km)<input type="number" id="km" value="18000" step="1" min="0"></label>
+              <label class="f">Siklus (BMS)<input type="number" id="cyc" value="320" step="1" min="0"></label>
+              <label class="f wide">File laporan (yang disimpan hanya hash SHA-256)
+                <select id="report">
+                  <option value="a1">lab-a-uji-2026-11-02.txt · SOH 94%</option>
+                  <option value="b">lab-b-uji-2026-11-05.txt · SOH 91%</option>
+                  <option value="a2">lab-a-refurbish-2026-11-07.txt · SOH 98%</option>
+                  <option value="panel">Teks atau file di panel Cek keaslian</option>
+                </select></label>
+            </div>
+            <p class="note" id="refurb-note" hidden>Refurbish (penggantian modul) boleh menaikkan SOH, tetapi odometer dan siklus tetap tidak boleh mundur.</p>
+            <div class="fields" id="f-grant" hidden>
+              <label class="f">Peran<select id="role"><option value="lab">Lab (LAB_ROLE)</option><option value="reg">Pabrikan (REGISTRAR_ROLE)</option></select></label>
+              <label class="f">Untuk akun<select id="target"><option value="4">Penjual</option><option value="5">Pembeli</option><option value="2">Lab A</option><option value="3">Lab B</option><option value="1">Pabrikan</option></select></label>
+            </div>
+            <button type="submit" class="btn" id="submit">Kirim</button>
+          </form>
+          <div class="result" id="result" hidden aria-live="polite"></div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card" id="history-card" aria-labelledby="h-h">
+          <div class="card-head"><h2 id="h-h">Riwayat baterai</h2><span class="sub">dibaca langsung dari kontrak, tanpa transaksi</span></div>
+          <form id="h-form" class="h-row">
+            <input type="text" id="h-serial" value="PACK-001" aria-label="Nomor seri pack" autocomplete="off">
+            <button type="submit" class="btn">Baca riwayat</button>
+          </form>
+          <p class="sub">ID baterai = keccak256(nomor seri) = <code id="h-id"></code></p>
+          <div id="history"></div>
+        </section>
+
+        <section class="card" id="verify-card" aria-labelledby="v-h">
+          <div class="card-head"><h2 id="v-h">Cek keaslian laporan</h2><span class="sub">hash dihitung di perangkat ini</span></div>
+          <p class="sub">Pilih laporan contoh atau file sendiri. SHA-256-nya dicocokkan dengan hash yang dicatat lab di kontrak. Coba ubah satu angka di teks.</p>
+          <div class="v-samples">
+            <button type="button" class="ghost v-sample" data-k="a1">Lab A · 2 Nov</button>
+            <button type="button" class="ghost v-sample" data-k="b">Lab B · 5 Nov</button>
+            <button type="button" class="ghost v-sample" data-k="a2">Refurbish · 7 Nov</button>
+            <button type="button" class="ghost v-tamper" id="v-tamper">Lab B, SOH diubah jadi 95%</button>
+          </div>
+          <label class="file-pick">atau file sendiri: <input type="file" id="v-file"><span id="v-file-name" class="mono"></span></label>
+          <textarea id="v-text" aria-label="Isi laporan" spellcheck="false"></textarea>
+          <div class="hashline"><span>SHA-256 file ini</span><code id="v-hash"></code></div>
+          <div class="v-result idle" id="v-result" aria-live="polite"></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="card" id="log-card" aria-labelledby="l-h">
+      <div class="card-head"><h2 id="l-h">Log transaksi</h2><span class="sub">terbaru di atas · klik baris untuk melihat event atau alasan penolakan</span></div>
+      <div class="scroll">
+        <table class="tbl">
+          <thead><tr><th class="num">Blok</th><th>Hash tx</th><th>Dari</th><th>Fungsi</th><th>Hasil</th><th class="num">Gas</th></tr></thead>
+          <tbody id="log-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="a-h">
+      <h2 id="a-h">Tentang MVP ini</h2>
+      <div class="about">
+        <div>
+          <h3>Yang bisa dibuktikan di sini</h3>
+          <ul>
+            <li>Hanya lab terdaftar yang bisa menulis hasil uji.</li>
+            <li>Odometer dan siklus tidak bisa mundur; SOH tidak bisa naik tanpa catatan refurbish.</li>
+            <li>Riwayat dari beberapa lab terbaca utuh oleh siapa saja.</li>
+            <li>File laporan yang diubah satu angka langsung tidak cocok.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Batasan</h3>
+          <ul>
+            <li>Rantai hanya hidup di tab ini dan mulai dari awal saat dimuat ulang.</li>
+            <li>Akun memakai kunci uji publik bawaan Hardhat; semua data laporan fiktif.</li>
+            <li>Kontrak tidak bisa memastikan lab mengukur dengan benar. Yang dijamin: catatan tidak bisa dihapus atau diganti diam-diam.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Kontrak yang berjalan</h3>
+          <div class="meta">
+            <span>Alamat</span><code id="contract-full"></code>
+            <span>Compiler</span><span>Solidity 0.8.28, optimizer 200 runs</span>
+            <span>Bytecode</span><span><span id="bytecode-size"></span> byte</span>
+            <span>keccak256</span><code id="bytecode-hash"></code>
+            <span>EVM</span><span>@ethereumjs/vm 10.1.3, hardfork Cancun</span>
+          </div>
+        </div>
+      </div>
+      <details class="src"><summary>Lihat kode BattChain.sol</summary><pre id="source"></pre></details>
+    </section>
+  </div>
+</main>
+<footer class="wrap">BattChain · MVP proyek Infrastruktur Blockchain, ITB · Kode lengkap, 25 tes, dan cara menjalankan dengan Hardhat ada di <a href="https://github.com/rafiafabian-oss/battchain" target="_blank" rel="noopener">github.com/rafiafabian-oss/battchain</a>.</footer>
+<!--APP-->
