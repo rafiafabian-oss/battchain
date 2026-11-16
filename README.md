@@ -6,6 +6,15 @@ Proyek MVP mata kuliah ET-4133 Infrastruktur Blockchain, Teknik Elektro ITB, sem
 
 Angka *state of health* (SOH) yang tampil di layar mobil listrik berasal dari BMS pabrikan, dan riset terbaru menunjukkan angka itu sering meleset dari kapasitas sebenarnya. Hasil uji dari lab independen tersebar di sistem masing-masing, sehingga penjual bisa menunjukkan hasil yang paling bagus saja. BattChain menyatukan semua hasil uji dari banyak lab ke satu riwayat per baterai. Hanya lab terdaftar yang boleh menulis, catatan tidak bisa dihapus, dan siapa pun bisa membacanya.
 
+## Coba MVP tanpa install
+
+Buka [`web/mvp.html`](web/mvp.html) di browser (unduh file-nya lalu klik dua kali, atau lewat GitHub Pages bila diaktifkan). Halaman ini menjalankan **bytecode BattChain yang sama dengan yang diuji di `test/`** di EVM dalam browser ([@ethereumjs/vm](https://github.com/ethereumjs/ethereumjs-monorepo)). Tidak perlu wallet atau node, dan tidak ada dana sungguhan.
+
+- Panduan uji 6 langkah: 3 transaksi diterima, 2 ditolak (`OdometerRollback`, `AccessControlUnauthorizedAccount`), lalu pembeli mencocokkan laporan.
+- Setiap aksi adalah transaksi bertanda tangan: hash, nomor blok, gas, dan event terlihat di log.
+- Riwayat dibaca dengan `getHistory()`; file laporan dicocokkan lewat SHA-256 di perangkat sendiri.
+- Akun memakai 6 kunci uji publik bawaan Hardhat (Admin, Pabrikan, Lab A, Lab B, Penjual, Pembeli). Rantai mulai dari awal saat halaman dimuat ulang.
+
 ## Cara kerja
 
 ```mermaid
@@ -32,8 +41,8 @@ flowchart LR
 |---|---|---|
 | 1 · Remix & Solidity, deploy kontrak awal | kontrak dengan peran + `registerBattery` | Selesai |
 | 2 · Fungsi inti, access control, tes dasar | `recordTest`, `recordRefurbish`, `getHistory`, 6 aturan, tes | Selesai: 25 tes lolos, coverage 100% |
-| 3 · UI sederhana, tes positif & negatif | halaman verifikasi pembaca `getHistory` + cek hash laporan | Prototipe jalan di node lokal |
-| 4 · Stabilisasi, deck teknis, gladi demo | deploy testnet, demo live | Berikutnya |
+| 3 · UI sederhana, tes positif & negatif | halaman verifikasi + MVP yang bisa dicoba tanpa install | Selesai: `web/mvp.html` (EVM di browser) |
+| 4 · Stabilisasi, deck teknis, gladi demo | deploy testnet, video cadangan, final deck | Berikutnya |
 
 ## Isi repo
 
@@ -42,7 +51,9 @@ contracts/BattChain.sol      smart contract (Solidity 0.8.28, OpenZeppelin Acces
 test/BattChain.test.js       25 tes otomatis: 6 aturan, peran, event, skenario end-to-end
 scripts/demo.js              skenario demo lengkap (diterima/ditolak + gas)
 scripts/deploy.js            deploy + beri peran awal (localhost / Sepolia)
-web/index.html               halaman verifikasi: cari nomor seri pack, lihat riwayat, cocokkan laporan, QR
+web/mvp.html                 MVP satu file: kontrak berjalan di EVM dalam browser, panduan uji, log transaksi
+web/index.html               halaman verifikasi untuk node lokal/testnet: riwayat, cocokkan laporan, QR
+mvp/                         sumber web/mvp.html (engine EVM, UI, skrip build)
 contoh-laporan/              3 laporan uji fiktif; SHA-256-nya yang dicatat di chain saat demo
 docs/demo-remix.md           langkah demo di Remix VM, lengkap dengan input
 ```
@@ -69,6 +80,15 @@ npm run demo:local
 ```
 
 Skrip demo mencetak alamat kontrak dan tautan seperti `web/index.html?address=0x5FbD…&pack=PACK-001`. Buka file itu di browser. Untuk mencoba cek keaslian laporan, pilih salah satu file di `contoh-laporan/` (hasilnya **cocok**), lalu coba lagi setelah mengubah satu angka di file itu (hasilnya **tidak cocok**).
+
+### Membangun ulang web/mvp.html
+
+```bash
+npx hardhat compile   # menghasilkan artifacts/ (ABI + bytecode)
+cd mvp
+npm install
+npm run build         # menulis ../web/mvp.html
+```
 
 ### Demo di Remix
 
@@ -100,7 +120,7 @@ Lihat [docs/demo-remix.md](docs/demo-remix.md). Kontrak hanya butuh satu file da
 
 - Blockchain tidak mencegah lab memasukkan angka palsu. Mitigasinya akreditasi lab, hash laporan, dan aturan kewajaran di kontrak.
 - Toleransi kenaikan SOH 3 poin masih asumsi tim untuk beda alat ukur, dan bisa diubah admin.
-- Halaman verifikasi belum di-hosting; saat ini membaca node lokal atau RPC yang diisi manual.
+- Kontrak belum di-deploy ke testnet publik. `web/mvp.html` memakai EVM lokal di browser, dan `web/index.html` membaca node lokal atau RPC yang diisi manual.
 
 ## Tim
 
